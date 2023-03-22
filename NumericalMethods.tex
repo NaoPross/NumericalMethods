@@ -1,0 +1,951 @@
+% vim: ts=2 sw=2 et tw=78:
+\documentclass[a4paper]{article}
+
+\usepackage{geometry}
+\newgeometry{margin=2.5cm}
+
+\usepackage{polyglossia}
+\setmainlanguage[variant=swiss]{german}
+
+\usepackage[shortlabels]{enumitem}
+\usepackage{bm}
+
+\usepackage{sansmathfonts}
+\usepackage{sfmath}
+% \usepackage{mathastext}
+
+% \setmainfont{LingWai SC}
+% \setmainfont{Nanum Pen Script}
+
+\renewcommand{\familydefault}{\sfdefault}
+\setmonofont[Scale=.9]{Hack}
+
+\usepackage{skeldoc}
+\usepackage{parskip}
+
+\usepackage{cancel}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+
+\newtheorem{defn}{Definition}
+\newtheorem{thm}{Satz}
+\newtheorem{bsp}{Beispiel}
+
+\newcommand*{\code}[1]{\texttt{#1}}
+
+\renewcommand{\vec}[1]{\mathbf{\bm{#1}}}
+\newcommand{\uvec}[1]{\vec{\hat{#1}}}
+
+\DeclareMathOperator{\dotp}{\boldsymbol\cdot}
+\DeclareMathOperator{\crossp}{\boldsymbol\times}
+
+\DeclareMathOperator{\grad}{\vec{\nabla}}
+\DeclareMathOperator{\divg}{\vec{\nabla}\dotp}
+\DeclareMathOperator{\curl}{\vec{\nabla}\crossp}
+
+\title{Numerische Methoden}
+\author{Naoki Pross -- \texttt{npross@student.ethz.ch}}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+  These are my (kinda crappy) notes I take during the lecture of Numerical
+  Method taught Dr. Roger Käppeli at ETH Zürich.
+\end{abstract}
+
+\section{Numerische Quadratur}
+
+Ziel:
+
+\begin{itemize}
+	\item Approximieren von bestimmten Integralen
+    \[
+      Q[I] \approx \int_a^b f(x) dx
+    \]
+  \item  Genauigkeit der Approximation
+  \item Fundamentale Konzepte der Numerik
+  \item Newton-Cates, Gauss, Adaptive Quadratur
+  \item zweidimensionale Quadratur
+\end{itemize}
+
+Wozu: Oft ist $\int_a^b f(x) dx$ nicht exact berechenbar 
+Idee:
+
+\begin{center}
+  \skelfig
+\end{center}
+
+\subsection{Polynomiale Interpolation}
+
+Gegeben $n+1$ paarweise verschiedene Stützstellen / Knoten $x_0, x_1, \ldots,
+x_n$ und zugehörige Stützwerte $y_0, y_1, \ldots, y_n$: finde das Polynom
+$n$-ten Grades
+\[
+  p_1(x) = a_0 + a_1 x + a_2 x^2 + \cdots + a_n x^n \quad \in \mathbb{P}_n,
+\]
+welches die sogenannte Interpolationsbedingung (IB) erfüllt:
+\[
+  p_1(x_j) = y_j \qquad (j = 0,1,\ldots,n).
+\]
+Die $n+1$ Koeffizienten $a_0, a_1, \ldots, a_n$ des sogenannten
+Interpolationspolynom (IP) ergeben sich einfach aus der IB $\leadsto$ Lineares
+Gleichungssystem (LGS).
+\begin{center}
+  \skelfig
+\end{center}
+MATLAB: \code{p = polyfit(x, y, n)}, Auswertung mit \code{polyval()}.
+
+Das IP kann man auch direkt mittels der Lagrange'schen Interpolationsformel
+(LI)
+\[
+  p_1(x) = \sum_{j=1}^n y_j L_j^n(x)
+  \quad\text{wobei}\quad
+  L_j^n(x) = \prod_{i=0, i\neq j}^n \frac{x - x_i}{x_j - x_i}
+\]
+die sog. Lagrandge-Polynome (LP) sind. Die LP haben die folgende
+Eigenschaften:
+\begin{itemize}
+  \item (LP1) $L_j^n(x)$ sind Polynome $n$-ten Grades
+  \item (LP2) $L_j(x_k) = \delta_{jk}$
+\end{itemize}
+LP2 ist der Grund wieso die LI die IB erfüllt.
+\[
+  p_n(x_i) = \sum_{j=0}^n y_j L_j^n(x)
+    = 0 + \cdots + 0 + y_i \underbrace{L_i^n(y_i)}_1 + 0 + \cdots + 0
+    = y_i
+\]
+
+\subsection{Interpolationsfehler}
+
+Sei also $f: I = [0,L] \to \mathbb{R}$ und bezeichnen mit
+\[
+  p[f | x_0, \ldots, x_n ] (x) \in \mathbb{P}_n
+\]
+das IP welcher die IB
+\[
+  p[f | x_0, \ldots, x_n ] (x_j) = f(x_j) \quad (j = 0, \ldots, n)
+\]
+erfüllt.
+\begin{center}
+  \skelfig
+\end{center}
+Für $f$ $(n+1)$-mal stetig differenzierbar lässt sich zeigen, dass es für
+jedes $x \in I$ ein $\xi = \xi(x) \in I$ gilt mit
+\[
+  e(x) = f(x) - p[f | x_0, \ldots, x_n ] (x)
+       = \frac{f^{(n+1)}(\xi)}{(n+1)!} \prod_{j=0}^n (x - x_j).
+\]
+$e(x)$ ist eine Fehlerfunktion über das Ganze Interpolations-Intervall $I$.
+Oft ist man (nur) am grössten Fehler über $I$ interessiert:
+\begin{align*}
+  \|e\|_\infty &= \max_{x \in I} |e(x)|
+    = \max_{x \in I} \left|
+      \frac{f^{(n+1)}(\xi(x))}{(n+1)!} \prod_{j=0}^n (x - x_j)
+    \right|
+    \leq \left(
+      \max_{x \in I} \left| \frac{f^{n+1}(\xi(x))}{(n+1)!} \right|
+    \right)\left(
+      \max_{x \in I} \left| \frac{f^{n+1}(\xi(x))}{(n+1)!} \right|
+    \right)
+    \\
+    &= \frac{\|f^{(n+1)}\|_\infty}{(n+1)!} \left\|
+        \prod_{j=0}^n \underbrace{(x - x_j)}_{\leq b-a}
+      \right\|_\infty
+    \leq \frac{\|f^{(n+1)}\|_\infty}{(n+1)!} (b-a)^{n+1}
+\end{align*}
+Die Aussage ``für $f$ $(n+1)$-mal stetig differenzierbar'' werden wir noch
+sehen: $f \in C^{n+1}[I]$, $f$ genügend glatt (\emph{smooth}), $f$ genügend
+oft stetig differenzierbar\footnote{Letzte 2 weniger präzis.}.
+
+\subsection{Numerische Integration = Quadratur}
+
+Ziel: Approx von
+\[
+  I[f] = \int_a^b f(x) dx
+\]
+
+Idee: Verwende polynomiale Interpolation um $f$ zu approximieren und
+integriere $p[f | x_0, \ldots x_n]$.
+
+\begin{defn}
+  Eine unendliche Rechenvorschrift der Form
+  \[
+    Q[f] = \sum_{j=0}^n \omega_j f(x_j)
+  \]
+  zur Approximieren von $I[f]$ nennt man Quadraturregel (QR) Quadraturformel.
+  Die $x_j \in [a,b]$ nennt man (Quadratur-) Knoten oder
+  Integrationsstützstellen und die $\omega_j$ (Quadratur-) Gewichte.
+\end{defn}
+
+Seien $x_0, x_1, \ldots, x_n \in I = [a,b]$ (Integrationsintervall) uns
+gegeben, dann ist das IP einer Funktion $f$ $p[f|x_0, \ldots x_n](x) =
+\sum_{j=0}^n f(x_j) L^n_j(x)$. Da das IP die Funktion approximiert, so gilt
+\begin{align*}
+  \int_a^b f(x) dx &\approx \int_a^b p[f|x_0,\ldots,x_n](x) dx \\
+    &= \int_a^b \sum_{j=0}^n f(x_j) L_j^n(x) dx \\
+    &= \sum_{j=0}^n f(x_j) \int_a^b L_j^n(x) dx \\
+    &= \sum_{j=0}^n f(x_j) \omega_j = Q_n[f].
+\end{align*}
+Die Quadratur-Gewichte:
+\[
+  \int_a^b L_j^n(x) dx = \omega_j.
+\]
+Beachte: Die Gewichte $\omega_j$ sind unabhängig von $f$. Also einmal
+ausrechnen und tabellieren.
+
+Die MR (Mittelwert), TR (Trapez) und SR (Simpson) sind Netwon-Cotes (NC)
+Quadraturregeln. Bei diesen Quadraturregeln verteilt man knoten $x_j$
+äquidistant über das Intervall $I = [a,b]$:
+\begin{align*}
+  n = 0 &: \frac{a+b}{2} \\
+  n > 0 &: x_j = a + \frac{b-a}{n} j, \quad j = 0, \ldots, n.
+\end{align*}
+
+Bemerkungen: 
+\begin{itemize}
+  \item TR und SR gehören zu den populärsten Quadraturregeln.
+  \item NC QR mit $n > 6$ werden numerisch unbrauchbar
+    (da negative Gewichte $\omega_j$)
+\end{itemize}
+
+\subsection{Quadraturfehler}
+
+Nun interessiern wir uns für den QR-Fehler:
+\begin{defn}[Quadraturfehler]
+  Wir nennen $E[f] = |Q[f] - I[f]|$ den Quadraturfehler (QF).
+\end{defn}
+
+Als ein Mass der Genauigkeit einer QR definirern wir:
+
+\begin{defn}[Genauigkeitsgrad]
+  Eine QR hat Genauigkeitsgrad (GG) $q \in \mathbb{N}$, falls sie alle Polynome
+  bis und mit grad $q$ exact integriert und $q$ die grösstmögliche Zahlt ist.
+\end{defn}
+
+\begin{defn}
+  Die Ordnung einer QR ist definiert durch $s = q + 1$.
+\end{defn}
+
+Dank der Linearität von des Integrals $I[f]$ und $Q[f]$ kann man den GG einfah
+bestimmen mit \footnote{da monome eine Basis in Polynomraum bilden}
+\begin{gather*}
+  Q[x^k] = I[x^k], \quad k = 0,1,\ldots,q \\
+  Q[x^{q + 1}] \neq I[x^{q + 1}]
+\end{gather*}
+
+Eine weiter Verainfachung bei der Bestimmung des GG, dass man es nur für das
+Referenzintervall (RI) $[-1, +1]$ überprüfen muss. Weil durch einfache
+Variabelsubstitution lässt sich ein beliebiges Intervall $[a,b]$ auf $[-1,+1]$
+transformier:
+\[
+  x = \frac{b-a}{2} t + \frac{a+b}{2}, \quad t \in [-1, +1] \\
+\]
+\begin{align*}
+  I[f] &= \int_a^b f(x) dx = \int_{-1}^1 f\left(
+      \frac{b-a}{2} t + \frac{a+b}{2}
+    \right) \underbrace{\frac{b-a}{2} dt}_{dx} \\
+  &= \frac{b-a}{2} \int_{-1}^1 f\left(
+      \frac{b-a}{2} t + \frac{a+b}{2}
+    \right) dt
+\end{align*}
+
+Es ist klar, dass Newton-Cates Quadraturregeln midestens den GG der
+zugrundliegenden IPs haben. Falls der Grad $n$ des IPs aber gerade ist, so
+gewinnt man ein GG gratis dazu.
+
+Für den QF lässt sich zeigen
+\[
+  % TODO: set equation name QF1
+  E[f] \leq \frac{\| f^{(q+1)} \|_\infty}{(q+1)!} (b-a)^{q+2}
+\]
+
+% Bsp (9) -> Slides
+
+Zusammengefasst: Je grösser der G, desto genauer ist eine QR, vorausgesetzt,
+das IP ist ene gute Approximatio von $f$\footnote{Polynome approximiern
+schlecht unstetige funktionen $\leadsto$ Intervall zerstückeln.}.
+
+\subsection{Summiere Quadraturregeln}
+
+Um eine bessere Approximation von $I[f]$ zu erhalten benutzt man im Algemein
+eine gegebene QR nicht über das ganze Intervall sondern über Teilintervalle.
+\begin{center}
+  \skelfig
+\end{center}
+
+Da Interall $I = [a,b]$ wird in $N$ Teil-Intervalle $I_j = [x_{j-1},x_j]$, ($j
+= 1,\ldots,N$) zerteilt mit
+\[
+  x_j = a + jh, \quad j = 0,1,\ldots,N
+  \qquad \text{und} \qquad
+  h = \frac{b - a}{N}.
+\]
+Nun wendet man auf jedes Teil-Intervall eine QR und summiert.
+
+\begin{bsp}[Summierte MR (SMR)]
+  \[
+    Q_0^N[f] = \sum_{j=0}^N Q_0[f \text{ auf } I_j]
+      = \sum_{j=1}^N h f \left( \frac{x_{j-1} + x_j}{2} \right)
+  \]
+\end{bsp}
+
+\begin{bsp}[Summierte TR (STR)]
+  \begin{align*}
+    Q_1^N[f] = \sum_{j=0}^N Q_1[f \text{ auf } I_j]
+      &= \sum_{j=1}^N \frac{h}{2} \left(
+        f(x_{j-1}) + f(x_j)
+        \right) \\
+      &= \frac{h}{2} f(x_0) + h \sum_{j=1}^{N-1} f(x_j)
+        + \frac{h}{2} f(x_N)
+      = \frac{h}{2} \left( f(a) + 2 \sum_{j=1}^{N-1} f(x_j) + f(b) \right)
+  \end{align*}
+  % umformung für wenn f(x) teuer zu auswerten ist.
+\end{bsp}
+
+\begin{bsp}[Summierte SR (SSR)]
+  \begin{align*}
+    Q_2^N[f] = \sum_{j=0}^N Q_2[f \text{ auf } I_j]
+      &= \sum_{j=1}^N \frac{h}{6} \left(
+          f(x_{j-1})
+          + 4 f\left( \frac{x_{j-1} + x_j}{2} \right)
+          + f(x_j)
+        \right) \\
+      &= \frac{h}{6} \left[ f(a) + 2 \sum_{j=1}^{N-1} f(x_j)
+        + 4 \sum_{j=1}^N f \left( \frac{x_{j-1} + x_j}{2} \right)
+        + f(b) \right]
+  \end{align*}
+\end{bsp}
+
+Wie verhilt sih der QF von SQRn? Der QF eine SQR ist (offensichtlich) die
+Summe der gemachten Fehler auf jeden Teil-Intervall:
+\begin{align*}
+  E^N[f] = | I[f] - Q_n^N[f]|
+    &= \biggl| \sum_{j=1}^N
+        I[f \text{ auf } I_j] - Q_n[f \text{ auf } I_j]
+      \biggr|
+  \leq \sum_{j=1}^N | I[f] \text{ auf } I_j] - Q_n[f \text{ auf } I_j] | \\
+  &\leq \sum_{j=1}^N \frac{ \max_{x \in I_j} |f^{(q+1)}(x)| }{(q+1)!}
+    {\underbrace{|x_j - x_{j-1}|}_h}^{q+2}
+  \leq \frac{ \|f^{(q+1)}\|_\infty}{(q+1)!} h^{q+1}
+    \underbrace{\sum_{j=1}^N h}_{Nh = b-a}.
+\end{align*}
+
+Zusammengefast:
+\[
+  E^N[f] \leq \frac{\| f^{(q+1)} \|_\infty}{(q+1)!} (b-a) h^{q+1}
+    = \frac{\| f^{(s)} \|_\infty}{s!} (b-a) h^{s}.
+\]
+
+Lanudau Symbol: $e = \mathcal{O}(h^p)$ falls $|e| \leq C h^p$ für positive
+Konstanten $C$, $p$ gilt alle $h$ klein genug. Für SQR $E^N[f] =
+\mathcal{O}(h^{q+1}) = \mathcal{O}(h^s)$.
+
+Bemerkgungen:
+\begin{itemize}
+  \item Die Ordnung $s$ kann sehr einfash in einem log-log-Plot ablesen;
+  \item Um volle Ordnung ($s = q+1$) zu erhalten muss die zu integrierende
+    Funktion glatt genug sein (genügend of stetig differenzierbar);
+\end{itemize}
+
+\subsection{Gauss-Quadratur}
+
+Idee: wähle die $n+1$ Knoten so, dass der grösstmögliche GG erreicht wird.
+Hoffnung: GG mit $q \approx n + n + 1 = 2n + 1$ ($n$ vom IP $n$-ten Grades,
+$n+1$ von der Knoten $x_j$)
+
+Frage: Was ist der grösstmögliche GG der man überhaupt erreichen kann?
+Betrachte Folgendes Polynom vom Grad $2n+2$auf dem RI
+\[
+  p(x) = \prod_{i = 0}^n (x - x_i) \in \mathbb{P}_{2n+2}.
+\]
+
+Klar: $I[p] = \int_{-1}^{+1} p(x) dx > 0$. Aber mit Quadratur
+\[
+  Q[p] = \sum_{j=0}^n \omega_j \underbrace{p(x_j)}_0 = 0.
+\]
+Also der grösstmögliche GG den man erreichen kann ist $q = 2n + 1$!
+
+Betrachten wir hierzu den Interpolationsfehler $ e(x) = f(x) - p[f | x_0,
+\ldots, x_n] (x) = K(x) \prod_{i=0}^n (x - x_i) $.  Sei nun $f(x) = x^m$ ein
+Monom mit $m \geq 0$ ganzzahlig. Dann ist
+\[
+  e(x) = x^m - \underbrace{
+    p[x^m | x_0, \ldots, x_n](x)}_{\text{Polynom von Grad } n} =
+  K(x) \underbrace{\prod_{i=0}^n (x - x_i)}_{\text{Polynom von Grad } n+1}
+\]
+($K(x)$ muss ein Polynom von grad $max\{m-n-1, 0\}$ sein) mit
+\[
+  K(x) = \begin{cases}
+    0 & \text{für } m \leq n, \\
+    r(x) \in \mathbb{P}_{m-n-1} & \text{für } m > n.
+  \end{cases}
+\]
+Integrieren wir nun $e(x)$ über das RI:
+\begin{align*}
+  \int_{-1}^{1} e(x) dx
+  &= \int_{-1}^{1} x^m dx - \int_{-1}^{1} p[x^m | x_0, \ldots, x_n](x) dx
+  = I[x^m] - Q[x^m] \\
+  &= \int_{-1}^{1} K(x) \prod_{i=0}^n (x - x_i) dx
+  = \begin{cases}
+    0 & \text{für } m \leq n, \\
+    \int_{-1}^{1} r(x) \prod_{i=0}^n (x - x_i) dx & \text{für } m > n.
+  \end{cases}
+\end{align*}
+
+Aber viel mehr noch: Wenn wir $n+1$ Knoten mit
+\[
+  \int_{-1}^{1} \underbrace{r(x)}_{\in \mathbb{P}_{n}}
+    \underbrace{\prod_{i=0}^n (x - x_i)}_{\in \mathbb{P}_{n+1}} dx = 0
+\]
+für $n < m < 2n + 2$ bestimmen können, so erhalten wir den grösstmöglichen GG.
+Aus der linearern Algebra ist bekannt
+\[
+  \langle f, g \rangle = \int_{-1}^{1} f(x) g(x) dx
+\]
+ein Skalaproduct in $C[-1,1]$ definiert. Wenn $\langle f,g \rangle = 0$, so
+sagt man dass $f$ und $g$ orthogonal zueinander sind. Also
+\[
+  \biggl\langle r(x), \prod_{i=0}^n (x - x_i) \biggr\rangle = 0
+\]
+sagt uns wir suchen Orthogonalpolynome! Dies führ uns zu den
+Legendre-Polynomen, welche durch folgende Rekusions-Formel gegeben sind
+\begin{gather*}
+  P_0(x) = 1, \qquad P_1(x) = x \\
+  P_{j+1}(x) = \frac{2j+1}{j+1} x P_j(x) - \frac{j}{j+1} P_{j-1}(x), j \leq 1.
+\end{gather*}
+Die $P_j(x)$ bilden eine orthogonale Basis von $\mathbb{P}_n$:
+\[
+  \langle P_i(x), P_j(x) \rangle
+    = \int_{-1}^{1} P_i(x) P_j(x) dx = 0, \quad i \neq j.
+\]
+Um den maximalen GG zu erhalten, wählen wir die $n+1$ Knoten so dass
+\[
+  \prod_{i=0}^n (x - x_i) \sim P_{n+1}(x)
+\]
+ein (skalares) vielfaches von $(n+1)$-Legendre Polynom ist. $\leadsto$ Wähle
+die Knoten $x_i$ als die Nullstellen von $P_{n+1}(x)$!
+
+Bemerkungen:
+\begin{itemize}
+  \item DIe Gewichte der GLQ sind stets positiv.
+  \item Für $n$ ``nicht zu gross' sind die GLQ tabelliert. F\"ur grosse $n$
+    werden die GLQ numerisch bestimmt (z.B. wie \"Ubung S03 \texttt{gauleg.m})
+  \item Es gilt stets: hohe Ordnung bedeutet nicht zwingend hohe Genaugkeit!
+    Dies gilt nur wenn $f$ glatt genug ist.
+  \item Allgemeiner betrachtet man
+    \[
+      I[f] = \int_a^b w(x) f(x) dx
+    \]
+    wobei $w(x)$ eine nichtnegative Gewichtsfunktion ist:
+    \begin{itemize}
+      \item $w(x) = 1 \leadsto$ Gauss-Legendre
+      \item $w(x) = 1/\sqrt{1 - x^2} \leadsto$ Gauss-Tschebyscheff
+      \item $w(x) = e^{-x^2} \leadsto$ Gauss-Hermite
+    \end{itemize}
+  \item Manchmal beginnt der Summationsindex bei 1
+    \[
+      G[f] = \sum_{j=1}^n \omega_j f(x_j).
+    \]
+    Dann ist GG $q = 2n-1$ und Ordnung $2n$.
+\end{itemize}
+
+\subsection{Adaptive Quadratur}
+
+Ziel: Berechne $I[f] = \int_a^b f(x) dx$
+bis auf eine vogegebene Toleranz
+\[
+  |Q[f] - I[f]| < \text{ Tol.}
+\]
+so effizient\footnote{D.h. mit so wenig Funktionauswertungen wie m\"oglich.} wie m\"oglich.
+
+Idee:
+
+\begin{center}
+  \skelfig
+\end{center}
+
+Dazu benötien einen lokalen Fehler-Sch\"atzer.
+
+Idee: Vergleiche das Resultat einer Methode mit dem Resultat einer genaueren
+Methode.
+
+\begin{bsp}
+  Slides (15) $\leadsto$ Zeigt dass obige einfache Idee durchaus brauchbare
+  Fehler-Sch\"ätzer liefert.
+\end{bsp}
+
+Untersuche wir den sogenannte Intervall-Halbierung Fehler-Sch\"ätzer etwas
+genauer. Betrachten wir ei Intervall $I = [a,b]$ und den QF einer QR Ordnung
+$s$
+\[
+  E[f] = | Q[f] - I[f] | \stackrel{\text{QF1}}{\leq}
+  \frac{\|f^{(s)}\|_\infty}{s!} (b-a)^{s+1}
+  = K (b-a)^{s+1}
+\]
+Dies nennt man einer \emph{a-priori} Fehlersch\"atzer. Dieser ist nat\"urlich
+(gewochnlich) nicht direkt brauchbar (weil $K$ bzw. $\| f^{(s)} \|$ unbekannt
+ist). F\"ur den QF git:
+\begin{align*}
+  E^1[f] &= | Q^1[f] - I[f] | \approx K(b-a)^{s+1} \\
+  E^2[f] &= | Q^2[f] - I[f] |
+    \approx \underbrace{
+      K \left(\frac{b-a}{2}\right)^{s+1}
+      + K \left(\frac{b-a}{2}\right)^{s+1}
+    }_{\text{Fehler auf halben Teil-Intervallen.}}
+    = \frac{K}{2^s} (b-a)^{s+1} = \frac{E^1[f]}{2^s}
+\end{align*}
+Nun
+\begin{align*}
+  E^1[f] &= |Q^1[f] \underbrace{- Q^2[f] + Q^2[f]}_{= 0 \text{ Trick}} - I[f]
+    \leq |Q^1[f] - Q^2[f]| + \underbrace{|Q^2[f] - I[f]|}_{E^1[f] / 2^s} \\
+  \leadsto E^1[f] &\approx \frac{2^s}{2^s-1} | Q^1[f] - Q^2[f] | \\
+  E^2[f] &\approx \frac{1}{2^s-1} |Q^1[f] - Q^2[f] | 
+\end{align*}
+Dies sind sogenannten \emph{a-posteriori} Fehler-Sch\"atzer.
+
+\begin{bsp}
+  Slides (16). Algorithmus kann mit eine zu klein Toleranz nie fertig rechnen
+  (unendliche Rekursion). Oder (17) nach ein Schritt fertig sein.
+\end{bsp}
+
+Bemerkung:
+\begin{itemize}
+  \item Adaptive Quadratur kann \emph{oft} gute Resultate liefern.
+  \item Adaptive quadratur kann auch schief gehen.
+  \item In MATLAB: \code{quad()}, \code{integral()}
+\end{itemize}
+
+\subsection{Zwei-Dimensionale Quadratur}
+
+% T = 43:30
+
+Bis jezt haben wir nur 1D Quadratur behandelt. Diese Methoden kann man relativ
+einfach aufh 2 oder 3 Dimensionen verellgemeinen. In 2D:
+\[
+  I[f] = \int_a^b \int_c^d f(x,y) \, dxdy
+    \approx \sum_{i=0}^n \omega_i^x \int_c^d f(x_i, y) \, dy
+    \approx \sum_{i=0}^n \omega_i^x \sum_{j=0}^m \omega_j^y f(x_i, y_j)
+    = \sum_{i=0}^n \sum_{j=0}^m \omega_i^x \omega_j^y f(x_i, y_j)
+\]
+
+\skelfig
+
+Dies kann man auch etwas verallgemeinen
+\[
+  I[f] = \int_a^b \int_{\phi_1(x)}^{\phi_2(x)} f(x,y) \, dxdy
+\]
+
+Ziel:
+\begin{itemize}
+  \item Approximieren von Integrale.
+  \item Genauigkeit der Approximation
+  \item Fundamentale Konzepte der Numerik
+  \item Newton-Cotes, Gauss, Adaptive Quadratur
+  \item 2D Quadratur
+\end{itemize}
+
+\section{Explizite Einschrittverfahren}
+
+Ziele:
+\begin{itemize}
+  \item Anfangswertprobleme (gew. DGL + Anfangswert)
+  \item Lösbarkeit
+  \item Explizite Einschrittverfahren (Euler, Runge-Kutta)
+  \item Genauigkeit (Disktretisierungsfehler)
+\end{itemize}
+
+Wozu: Viele Anwendungen!
+
+\subsection{Motivation}
+
+\paragraph{Schwingkreis}
+
+\[
+  \ddot{I} + \frac{R}{L} \dot{I} + \frac{1}{LC} I = 0
+\]
+
+(Skalare) gewöhnliche Differenzialgleichung 2. Ordnung für den Strom $I(t)$.
+
+\begin{center}
+\skelfig{RLC Diagram}
+\end{center}
+
+\paragraph{Molekular-Dynamik (MD)}
+
+\[
+  m_i \ddot{\vec{x}}_i = - \grad U(\vec{x}_1, \ldots, \vec{x}_N)
+\]
+wobei
+\begin{itemize}
+  \item $N$ Anzahl Atome / Moleküle
+  \item $\vec{x}_i$ Position des $i$-ten Atom / Molekül
+  \item $U$ Potential
+\end{itemize}
+
+\paragraph{Maxwell-Gleichungen}
+\begin{align*}
+  \curl \vec{H} &= \vec{J} + \partial_t \vec{D} &
+  \curl \vec{E} &= \partial_t \vec{B} \\
+  \divg \vec{D} &= \rho &
+  \divg \vec{B} &= 0 
+\end{align*}
+
+System von partiellen DGL.
+
+Zur Illustration betrachten wir (die) einfache skalare DGL
+\[
+  \dot{y}(t) = y(t) = f(t, y(t))
+\]
+Eine (skalare) DGL lässt sich graphisch mit einen Richtungsfeld / Vektorfeld
+darstellen:
+\begin{center}
+  \skelfig
+\end{center}
+
+Eine etwas ``interessante'' (skalare) DGL:
+\[
+  \dot{y}(t) = ay(t) - by^2(t) = (a - by(t)) y(t)
+\]
+
+Graphisch:
+\begin{center}
+  \skelfig
+\end{center}
+
+\subsubsection*{Einfache Approximation der Lösung}
+
+\begin{enumerate}[(1)]
+  \item Diskretisiere das Zeitintervall $I = [t_0, T]$
+    \[
+      t_k = t_0 + kh, \qquad k = 0, 1, \ldots, N
+      \qquad \text{mit} \quad
+      h = \frac{T - t_0}{N}
+    \]
+  \item Setzen Anfangswert $y_0 = y(t_0)$
+  \item Berechne für $k = 0, 1, \ldots, N-1$
+    \[
+      y_{k+1} = y_k + h f(t_k, y_k)
+    \]
+  \item Dies ist das \emph{Euler Verfahren} oder expliziter Euler oder
+    Vorwärts Euler.
+\end{enumerate}
+
+In allgemein stellen sich nun folgende Fragen:
+\begin{enumerate}[(i)]
+  \item Macht es Sinn (approx.) Lösungen zu suchen? (Bedindungen an die rechte
+    Seite $f(t, y(t))$ für Existenz und Eindeutigkeit)
+  \item DGL'en höherer Ordnung?
+  \item Konvergiert das Euler Verfahren gegen die exakten Lösungen für $h \to
+    0$? Wie schnell?
+  \item Gibt es ``bessere'' Methoden?
+\end{enumerate}
+
+\subsection{Grundbegriffe}
+
+\begin{defn}
+  Ein skalares Anfangswertproblem (AWP) erster Ordnung: Find eine Funktion
+  $y(t)$ einer Variablen (z.B. die Zeit) mit
+  \[
+    \dot{y}(y) = f(t, y(t))
+    \qquad
+    \text{(gew. DGL 1. Ordnung)}
+  \]
+  auf dem Intervall $[t_0, T_0]$ und $y(t_0) = y_0$ (Anfangswert, AW, auch
+  Anfangsbedingung).
+\end{defn}
+
+Im allgemein sind $\vec{y}$, $\dot{\vec{y}}$, $\vec{f}$, $\vec{y}_0$ Vektoren:
+\[
+  \dot{\vec{y}}(t) = \begin{bmatrix}
+    \dot{y}_1(t) \\ \vdots \\ \dot{y}_n(t)
+  \end{bmatrix}
+  = \begin{bmatrix}
+    f_1(t, y_1, \ldots, y_n(t)) \\ \vdots \\ f_n(t, y_1, \ldots, v_n(t))
+  \end{bmatrix}
+\]
+und die Anfangsbedingungen sind $y_1(t_0) = y_{1,0}, \ldots, y_n(t_0) =
+y_{n,0}$.
+
+\begin{bsp}
+  Lineares DGL System
+  \[
+    \dot{\vec{y}}(t) = A \vec{y}(t), \qquad
+    \vec{y} \in \mathbb{R}^n, A \in \mathbb{R}^{n\times n}
+  \]
+  Lösung: $\vec{y}(t) = e^{At} \vec{y}_0$
+\end{bsp}
+
+\begin{defn}
+  Ein (skalares) AWP $n$-ter Ordnung: Finde die Funktion $y(t)$ einer
+  Variable (z.B. Zeit) mit
+  \[
+    y^{(n)}(t) = f(t, y(t), \dot{y}(t), \ddot{y}(t), \ldots, y^{(n-1)}(t))
+  \]
+  auf dem Intervall $I= [t_0, T]$,
+  $y(t_0) = y_0$, $\dot{y}(t) = \dot{y}_0$, $\ldots, y^{(n-1)}(t) =
+  y_0^{(n-1)}$.
+\end{defn}
+
+\begin{bsp}[Newton'schen Bewegungsgleichung]
+  \[
+    \text{(Masse)} \text{(Beschleunigung)} = m \dot{x}
+    = \text{(Kraft)} = F
+  \]
+  mit $x(t_0) = y_0$ (Anfangs-Position), $\dot{x}(t_0) = \dot{y}_0 = v_0$
+  (Anfangs-Geschwindigkeit).
+\end{bsp}
+
+\subsubsection*{Reduktion auf ein System erster Ordnung}
+
+Gegeben eine DGL $n$-ter Ordnung
+\[
+  y^{(n)}(t) = f(t, y(t), \dot{y}(t), \ldots, y^{(n-1)}(t))
+\]
+Wir definieren ($(n-1)$ DGL 1. Ordnung)
+\[
+  z_0(t) = y(t), \quad
+  z_1(t) = \dot{y}(t) = \dot{z}_0, \quad
+  \ldots, \quad
+  z_{n-1} = y^{(n-1)}(t) = \dot{z}_{n-2}
+\]
+und (1. DGL 1. Ordnung)
+\[
+  \dot{z}_{n-1} = y^{(n)}(t) = f(t, y(t), \dot{y}(y), \ldots, y^{(n-1)}(t))
+  = f(t, z_0(t), z_1(t), \ldots, z_{n-1}(t)).
+\]
+
+Diese $n$ DGL 1. Ordnung schreiben wir als System
+\[
+  \dot{\vec{z}}(t) = \vec{g}(t, \vec{z}(t)),
+\]
+wobei $\vec{z}(t) = (z_0(t), z_1(t), \ldots, z_n(t))^\mathsf{T}$, $\vec{g}(t,
+\vec{z}(t)) = (z_1(t), z_2(t), \ldots, f(t, z_0(t), z_1(t), \ldots
+z_{n-1}(t)))^\mathsf{T}$. Für die AWV $\vec{z}(t_0) = \vec{z}_0 = (y_0, y_1,
+\ldots, y_{n-1})^\mathsf{T}$.
+
+\begin{bsp}
+  \[
+    \ddot{y} = f(t, y(t), \dot{y}(t)), \qquad
+    y(t_0) = y_0, \quad \dot{y}(t_0) = \dot{y}_0.
+  \]
+  \begin{align*}
+    z_0(t) &= y(t) \\
+    z_1(t) &= \dot{y}(t) = \dot{z}_0(t) \\
+    z_2(t) &= \ddot{y}(t) = \dot{z}_1(t) = f(t, y(t), \dot{y}(t))
+  \end{align*}
+  somit
+  \[
+    \dot{\vec{z}} = \begin{bmatrix}
+      \dot{z}_0(t) \\ \dot{z}_1(t)
+    \end{bmatrix}
+    = \vec{g}(t, \vec{z}(t))
+    = \begin{bmatrix}
+      z_1 \\ f(t, z_0(t), z_1(t)
+    \end{bmatrix}
+  \]
+  und die AW'e
+  \[
+    \vec{z}(t_0) = \vec{z}_0 = \begin{bmatrix}
+      y_0 \\ \dot{y}_0
+    \end{bmatrix}
+  \]
+\end{bsp}
+
+\begin{defn}
+  Eine gewöhnliche DGL heisst autonom, falls die rechtes Seite die Form
+  $\vec{f} = \vec{f}(\vec{y}(t))$ hat (anstatt $\vec{f} = \vec{f}(t,
+  \vec{y}(t))$).
+\end{defn}
+
+\subsubsection*{Autonomisieren von DGL'en}
+
+Betrachte folgende DGL
+\[
+  \dot{\vec{y}} = \vec{f}(t, \vec{y}(t)), \qquad
+  \vec{y} \in \mathbb{R}^n.
+\]
+Durch einführen der neuen Variablen
+\[
+  \vec{z} = \begin{bmatrix}
+    \vec{y}(t) \\ t
+  \end{bmatrix} = \begin{bmatrix}
+    \vec{z}_1(t) \\ z_{n+1}
+  \end{bmatrix}
+\]
+und die rechte Seite
+\[
+  \vec{g}(\vec{z}(t)) = \begin{bmatrix}
+    \vec{f}(t, \vec{y}(t)), 1
+  \end{bmatrix} = \begin{bmatrix}
+    \vec{f}(z_{n+1}, \vec{z}_1), 1
+  \end{bmatrix}.
+\]
+Damit
+\[
+  \dot{\vec{z}} = \vec{g}(\vec{z}(t)).
+\]
+
+\begin{bsp}
+  \[
+    \dot{y} = y(t)^2 + t^2,
+    \quad
+    \vec{z}(t) = \begin{bmatrix}
+      z_1(t) \\ z_2(t) 
+    \end{bmatrix} = \begin{bmatrix}
+      y(t) \\ t
+    \end{bmatrix},
+    \quad
+    \vec{g}(\vec{z}(t)) = \begin{bmatrix}
+      z_1(t)^2 + z_2(t)^2 \\ 1
+    \end{bmatrix}
+    \quad\leadsto\quad
+    \dot{\vec{z}} = \vec{g}(\vec{z}(t))
+  \]
+\end{bsp}
+
+Bemerkung: Allgemein bezeichnet man DGL höheren Ordnung als autonom, falls die
+rechte der DGL nicht explizit von der Zeit abhängt.
+
+\subsubsection{Existenz, Eindeutigkeit und Stabilität}
+
+\begin{enumerate}[(i)]
+  \item Was muss erfüllt sein damit es überhaupt Lösungen gibt? (Existenz)
+  \item Gibt es mehrere Lösungen? Under welchen Bedingungen (Eindeutigkeit)
+  \item Wie hängt die Lösung vom AW ab? (Stabilität)
+\end{enumerate}
+
+Betrachten wir Folgendes (allgemeines) AWP
+\begin{align*}
+  \dot{\vec{y}}(t) &= \vec{f}(t, \vec{y}(t)) & &\text{(System DGL)} \\
+  \vec{y}(t_0) &= \vec{y}_0  & &\text{(AW)}
+\end{align*}
+wobei
+\[
+  \vec{y} : I = [t_0, T] \subset \mathbb{R} \to D \subset \mathbb{R}^n,
+  \qquad
+  \vec{f}: I \times D \to \mathbb{R}^n.
+\]
+$D$ heisst Zustands- oder Phasenraum.
+
+Um (i) und (ii) sicherzustellen, benötigt:
+
+\begin{defn}
+  Eine Funktion $\vec{f}: I \times D \to \mathbb{R}^n$ ist Lipschitz-stetig in
+  (Variable) $\vec{y}$ mit Lipschitz-Kontante $C \leq 0$, wenn für alle $t \in
+  I$ und $\vec{y}, \vec{z} \in D$ gilt
+  \[
+    \|\vec{f}(t, \vec{y}) - \vec{f}(t, \vec{z})\|
+    \leq C \|\vec{y} - \vec{z}\|.
+  \]
+  Hier ist $\| \cdot \|$ eine Norm.
+\end{defn}
+
+Bemerkungen:
+\begin{itemize}
+  \item Lipschitz-Stetigkeit breschränkt wie stark eine funktion um einen
+    Punkt sich verändern kann:
+    \begin{center}
+      \skelfig
+    \end{center}
+  \item Stetige differenzierbare Funktionen sind Lipschitz-Stetig: Setze $C =
+    \max_{k \in [a,b]} | f'(y) |$
+  \item Auch nicht differenzierbare Funktionen können Lipschitz-Stetig sein,
+    z.B. $f(y) = |y|$.
+  \item Mancham auch Lipschitz-Bedingung genannt.
+\end{itemize}
+
+Ist $f(y) = \sqrt{y}$, $y \in \mathbb{R}^+$ Lipschitz-Stetig? Nicht bei 0.
+
+\begin{thm}[Picard-Lindelöf]
+  Sei $\vec{f}$ stetig in $(t, \vec{y})$ und Lipschitz-Stetig in $\vec{y}$ auf
+  $[t_0, t_0 + \delta] \times D$, mit $\delta > 0$ und $D$ soll eine Umgebung
+  von $\vec{y}_0$ dem AW.
+
+  Dann existier eine eindeutige Lösung $\vec{y}(t)$ des AWP
+  \[
+    \dot{\vec{y}} = \vec{f}(t, \vec{y}(t)), \quad
+    \vec{y}(t_0) = \vec{y}_0
+  \]
+  für zumindest eine kurze Zeit $[t_0, t_0 + \varepsilon]$, $\varepsilon > 0$.
+\end{thm}
+
+\begin{bsp} \label{bsp:dgl-eindeutig-8}
+  \[
+    \dot{y}(t) = 2\sqrt{|y(t)|}, \qquad y(0) = 0.
+  \]
+  Lösungen: $y(t) = 0$, $y(t) = t |t|$ (Zwei Lösungen).
+  Grund: $f(t, y(t)) = 2\sqrt{|y|}$ nicht Lipschitz-Stetig bei $y=0$
+\end{bsp}
+\begin{bsp}
+  Bsp. \ref{bsp:dgl-eindeutig-8} (oben) mit $y(1) = 1$ $\leadsto y(t) = t|t|$
+  eindeutige Lösung.
+\end{bsp}
+\begin{bsp}
+  \[
+    \dot{y}(t) = y^2(t), \qquad
+    y(0) = y_0 > 0.
+  \]
+  Lösungen:
+  \[
+    y(t) = \frac{y_0}{1-y_0 t}
+  \]
+  aber nur für $0 < t < 1/y_0$ (``zumindest für eine kurze Zeit'').
+  Grund: Lipschitz-Kontante unbeschränkt.
+\end{bsp}
+
+\begin{thm}
+  \label{thm:lipschitz-stetig-distanz}
+  Die Funktion $\vec{f}$ sei Lipschitz-stetig mit die Lipschitz-Kinstante $C$
+  in einer Umgebung der AW'e $\vec{y}_0, \vec{z}_0$ und seien $\vec{y}(t),
+  \vec{z}(t)$ die Lösungen des jeweiligen AWP's.
+
+  Dann gilt für $t \in [t_0, t_0 + \varepsilon]$:
+  \[
+    \|\vec{y}(t) - \vec{z}(t)\|
+    \leq e^{C(t-t_0)} \|\vec{y}_0 - \vec{z}_0\|.
+  \]
+\end{thm}
+
+Bemerkung: Satz \ref{thm:lipschitz-stetig-distanz} stellt sicher dass die
+Lösungen stetig vom AW abhängen. Aber Lösungen können exponentiell in der Zeit
+ausseinanderlaufen.
+
+\begin{bsp}
+  \begin{align*}
+    \dot{\vec{y}} &= \lambda \vec{y}(t), \vec{y}(t_0) = \vec{y}_0 
+      &\leadsto \vec{y}(t) &= \vec{y}_0 e^{\lambda (t-t_0)} \\
+    \dot{\vec{z}} &= \lambda \vec{z}(t), \vec{z}(t_0) = \vec{z}_0 
+      &\leadsto \vec{z}(t) &= \vec{z}_0 e^{\lambda (t-t_0)}
+  \end{align*}
+  \[
+    \vec{y}(t) - \vec{z}(t) = e^{\lambda (t-t_0)} (\vec{y}_0 - \vec{z}_0).
+  \]
+\end{bsp}
+
+\subsection{Runge-Kutta Verfahren}
+
+Betrachten
+\[
+  \dot{y}(t) = f(t, y(t)), \qquad
+  y(t_0) = y_0.
+\]
+Formal (Integral-Gleichung, nicht unbedingt einfacher):
+\[
+  y(t) = y_0 + \int_{t_0}^t f(\tau, y(\tau)) \, d\tau
+\]
+
+Idee: Verwende Quadratur für das Integral der Funktion $f$. Konkret: $t_0,
+y_0$ und integrieren bis $t_1, y_1$, wobei $t_1 = t_0 + h$, mit Quadratur
+\begin{align*}
+  y(t_1) &= y_0 + \int_{t_0}^{t_1} f(\tau, y(\tau)) \, d\tau
+    = y_0 + h \int_0^1 f(t_0 + h\tau, y(t_0 + h\tau)) \, d\tau \\
+  &= y_0 + h \sum_{i=1}^s \omega_i
+    f(t_0 + h c_i, y(\underbrace{t_0 + h c_i}_\text{Knoten}))
+\end{align*}
+\skelfig
+
+
+\end{document}
