@@ -1,4 +1,4 @@
-% vim: ts=2 sw=2 et tw=78:
+% vim: ts=2 sw=2 et tw=78 spell spelllang=de:
 \documentclass[a4paper]{article}
 
 \usepackage{geometry}
@@ -8,25 +8,22 @@
 \setmainlanguage[variant=swiss]{german}
 
 \usepackage[shortlabels]{enumitem}
+\usepackage{array}
+
+\usepackage{cancel}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
 \usepackage{bm}
 
-\usepackage{sansmathfonts}
 \usepackage{sfmath}
-% \usepackage{mathastext}
-
-% \setmainfont{LingWai SC}
-% \setmainfont{Nanum Pen Script}
+\usepackage{lmodern}
 
 \renewcommand{\familydefault}{\sfdefault}
 \setmonofont[Scale=.9]{Hack}
 
 \usepackage{skeldoc}
 \usepackage{parskip}
-
-\usepackage{cancel}
-\usepackage{amsmath}
-\usepackage{amssymb}
-\usepackage{amsthm}
 
 \newtheorem{defn}{Definition}
 \newtheorem{thm}{Satz}
@@ -36,6 +33,8 @@
 
 \renewcommand{\vec}[1]{\mathbf{\bm{#1}}}
 \newcommand{\uvec}[1]{\vec{\hat{#1}}}
+
+\newcommand{\mx}[1]{\mathbf{\bm{#1}}}
 
 \DeclareMathOperator{\dotp}{\boldsymbol\cdot}
 \DeclareMathOperator{\crossp}{\boldsymbol\times}
@@ -851,7 +850,7 @@ Bemerkungen:
       \skelfig
     \end{center}
   \item Stetige differenzierbare Funktionen sind Lipschitz-Stetig: Setze $C =
-    \max_{k \in [a,b]} | f'(y) |$
+    \max_{y \in [a,b]} | f'(y) |$
   \item Auch nicht differenzierbare Funktionen können Lipschitz-Stetig sein,
     z.B. $f(y) = |y|$.
   \item Mancham auch Lipschitz-Bedingung genannt.
@@ -945,7 +944,223 @@ y_0$ und integrieren bis $t_1, y_1$, wobei $t_1 = t_0 + h$, mit Quadratur
   &= y_0 + h \sum_{i=1}^s \omega_i
     f(t_0 + h c_i, y(\underbrace{t_0 + h c_i}_\text{Knoten}))
 \end{align*}
-\skelfig
 
+\begin{center}
+  \skelfig
+\end{center}
+
+Problem: $y(t_0 + hc_i)$ immer noch unbekannt $\leadsto$ approximieren.
+Versuchen wir es mit der Mittelpunktregel
+\[
+  y(t_1) \approx y_0 + h f \left(
+    t_0 + \frac{h}{2}, y\left(t_0 + \frac{h}{2}\right)
+  \right)
+\]
+Kennen wir $y(t_0, h/2)$ nicht, aber approx mit dem Euler Verfahren
+\[
+  y\left(t_0 + \frac{h}{2}\right) \approx
+  y_0 + \frac{h}{2} f(t_0, y_0) = y_{1/2}
+\]
+Eingesetzt:
+\[
+  y(t_1) \approx y_0 + h f \left(
+    t_0 + \frac{h}{2}, y_{1/2}
+  \right) = y_1
+\]
+Zusammenfassend:
+\[
+  k_1 = f(t_j, y_j), \qquad
+  k_2 = f\left(t_j + \frac{h}{2}, y_j + \frac{h}{2} k_1 \right), \qquad
+  y_{j+1} = y_j + hk_2
+\]
+für $j = 0,1,\ldots,N-1$. Dieser ist bekannt als \emph{verbesserte
+Polygonzug-Methode von Euler} (auch modifizierte Euler Verfahren, oder
+explizite Mittelpunkts-Methode).
+
+Eine andere Möglichkeit mit TR:
+\[
+  y(t_1) \approx y_0 + \frac{h}{2} \left(
+    f(t_0, y_0) + f(t_0 + h, y(t_0 + h))
+  \right).
+\]
+Wieder mit dem Euler Verfahren $y(t_0 + h)$ approximieren\footnote{Tilde weil
+in prinzip $\tilde{y}_1$ nur ein Zwischenwert ist.}:
+\[
+  y(t_1) \approx y_0 + hf(t_0, y_0) = \tilde{y}_1.
+\]
+Graphisch:
+
+\begin{center}
+  \skelfig
+\end{center}
+
+Wir erhalten
+\[
+  k_1 = f(t_j, y_j), \qquad
+  k_2 = f(t_j + h, y_j + h k_1), \qquad
+  y_{j+1} = y_j + \frac{h}{2} (k_1 + k_2)
+\]
+für $j = 0,1,\ldots,N-1$. Dies Verfahren ist bekannt als das \emph{Verfahren
+von Heun} (auch explizite Trapez-Methode).
+
+Alle Verfahren bis jetzt sind Teil der Runge-Kutta (RK) Einschrittverfahren
+(ESV).
+
+\begin{bsp}
+  Butcher Tableau (BT) der verbesserten Polygon-Zug Methode von Euler.
+  \[
+    \begin{array}{r|rr}
+      0   & 0   & 0 \\
+      1/2 & 1/2 & 0 \\
+      \hline
+          & 0   & 1
+    \end{array}
+    =
+    \begin{array}{r|rr}
+      \vec{c} && \mx{A} \\\\ \midrule
+              && \vec{b}^\mathsf{T}
+    \end{array}
+  \]
+  Dann
+  \begin{align*}
+    k_1 &= f(t_j + c_1 h, y_j + h(a_{11} k_1 + a_{12} k_2) = f(t_j, y_j) \\
+    k_2 &= f(t_j + c_2 h, y_j + h(a_{21} k_1 + a_{22} k_2)
+      = f(t_j + h/2, y_j + h k_1 / 2) \\
+    y_{j+1} &= y_j + h(b_1 k_1 + b_2 k_2) = y_j + h k_2
+  \end{align*}
+\end{bsp}
+
+
+\begin{bsp}
+  BT des Euler Verfahrens:
+  \[
+    k_1 = f(t_j, y_j), \qquad
+    y_{j+1} = y_+j + h k_1, \qquad \qquad
+    \begin{array}{r|r}
+      0 & 0 \\ \hline & 1
+    \end{array}
+  \]
+\end{bsp}
+
+Genau gleich für Systeme: $y \to \vec{y}$, $f \to \vec{f}$. RK sind sehr
+allgemein. E gibt sogenannten implizite Varfahren
+
+\begin{bsp}[Implizite Mitteplutsk-Methode]
+  \[
+    \begin{array}{r|r}
+      1/2 & 1/2 \\ \hline & 1
+    \end{array} \qquad\qquad
+    k_1 = f(t_j + h/2, y_j + h k_1 / 2), \quad
+    y_{j+1} = y_j + h k_1.
+  \]
+  Implizit weil $k_1$ auf beide seiten vorkommt (kann eine Nichtlineare
+  Beziehung haben).
+\end{bsp}
+
+Implizite Methode benötigt man bei sogenannten steifen Problemen $\leadsto$
+Kapitel 5. Explizite RK-Verfahren haben ein Butcher Tableau
+\[
+  \begin{array}{r|ccccc}
+    c_1    & 0      & 0      & \cdots & 0       & 0  \\
+    c_2    & a_{21} & 0      & \cdots & 0       & 0  \\
+    \vdots & \vdots & \vdots & \ddots & \vdots  & \vdots \\
+    c_s    & a_{s1} & a_{s2} & \cdots & a_{s,s-1} & 0 \\
+    \hline
+           & b_1    & b_2    & \cdots & b_{s-1} & b_s
+  \end{array}
+\]
+D.h. $\mx{A}$ ist eine untere Dreiecksmatrix mit Nullen auf der Diagonale. Das
+wohl bekanntetste RK ist das sogennante \emph{klassische RK-Verfahren} (auch
+DAS RK, oder RK4, da es 4 Stufen hat):
+\[
+  \begin{array}{r|cccc}
+    0   & 0   & 0   & 0   & 0 \\
+    1/2 & 1/2 & 0   & 0   & 0 \\
+    1/2 & 0   & 1/2 & 0   & 0 \\
+    1   & 0   & 0   & 1   & 0 \\
+    \hline
+        & 1/6 & 2/6 & 2/6 & 1/6
+  \end{array}
+\]
+
+\subsection{Fehlerbetrachtungen für ESV}
+
+Fehler untersuchen vor ESV:
+\[
+  y_{j+1} = y_j + h \phi(t_j, y_j, h)
+\]
+wobei $\phi$ die sogenannte Verfahrens- oder Inkrement-Funktion ist.
+
+Bemerkungen:
+\begin{enumerate}[(i)]
+  \item Bei RK-ESV ist $\phi(t_j,y_j,h) = \sum_{i=1}^s b_i k_i$.
+  \item Bei einem expliziten ESV kann man $\phi$ durh einsetzen einfach
+    berechnen. Bei einem implizten ESV muss in Allgemein nicht-lineare
+    Gleichungssysteme lösen um $\phi$ zu berechnen.
+\end{enumerate}
+
+Im folgenden, betrachten das skalare AWP
+\[
+  \dot{y}(t) = f(t, y(t)), \quad
+  y(t_0) = y_0
+\]
+auf Intervall $t \in [t_0, T]$. Mit $y(t)$ bezeichnen wir stets  die exakte
+Lösung. Wir approximieren diese Lösung durch diskretisieren des Zeitintervalls
+in $N$ Teilintervalle
+\[
+  t_j = t_0 + jh, 
+  \qquad\text{mit der Schrittweite / Zeitschritt}\quad
+  h = \frac{T-t_0}{N}.
+\]
+Die approximierte Lösung zur $t_j$ bezeichnen mit $y_j$. Also $y(t_j) \approx
+y_j$.
+
+\begin{defn}
+  Der globale Diskretisierungsfehler (GDF) zur zeit $t_j$ ist definiert
+  durch
+  \[
+    \epsilon_j = y(t_j) - y_j
+  \]
+\end{defn}
+
+D.h. $\epsilon_j$ ist der Fehler nach $j$ Schritten.
+
+\begin{defn}
+  Ein ESV heisst konvergent von Ordnung $p$ (oder hat Konvergenzordnung $p$),
+  falls filt
+  \[
+    \epsilon = \max_{j=0,1,\ldots,N} \underbrace{|y(t_j) - y_j|}_{\epsilon_j}
+    = \mathcal{O}(h^p)
+  \]
+  für $h$ klein genug.
+\end{defn}
+
+\begin{bsp}
+  Empirische KO der berets gesehen Verfahren berechnet $\leadsto$ Slides
+  \begin{center}
+    \begin{tabular}{lr}
+      Euler       & $\sim \mathcal{O}(h^1)$ \\
+      verb. Euler & $\sim \mathcal{O}(h^2)$ \\
+      Heun        & $\sim \mathcal{O}(h^2)$ \\
+      RK4         & $\sim \mathcal{O}(h^4)$
+    \end{tabular}
+  \end{center}
+\end{bsp}
+
+Um die KO eines ESV theoretisch zu untersuchen, benötigt man
+\begin{defn}
+  Der lokale Diskretisierungsfehler (LDF) zur Zeit $t_j$ ist definiert durch
+  \[
+    e_j = y(t_j) - \left(
+      y(t_{j-1}) + h\phi(t_{j-1}, y(t_{j-1}), h)
+    \right).
+  \]
+\end{defn}
+D.h. $e_j$ ist der Fehler nach einem Schritt aussehend von der exakten Lösung.
+
+Graphisch:
+\begin{center}
+  \skelfig
+\end{center}
 
 \end{document}
